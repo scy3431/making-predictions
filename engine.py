@@ -7,9 +7,9 @@ import numpy as np
 from scipy.ndimage import gaussian_filter1d
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────[...]
 # Earnings helper
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────[...]
 
 def _get_earnings(ticker) -> dict | None:
     """
@@ -51,9 +51,9 @@ def _get_earnings(ticker) -> dict | None:
         return None
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────[...]
 # Main entry point
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────[...]
 
 def process_stock_data(ticker_symbol: str):
     """
@@ -80,12 +80,23 @@ def process_stock_data(ticker_symbol: str):
     hist["BB_Std"]   = hist["Close"].rolling(20).std()
     hist["BB_Upper"] = hist["BB_Mid"] + 2 * hist["BB_Std"]
     hist["BB_Lower"] = hist["BB_Mid"] - 2 * hist["BB_Std"]
+    
+    # Bollinger Band Percentage (for RL agent)
+    hist["BB_Pct"] = (hist["Close"] - hist["BB_Lower"]) / (hist["BB_Upper"] - hist["BB_Lower"])
+    hist["BB_Pct"] = hist["BB_Pct"].clip(0, 1)  # Clamp to [0, 1]
 
     # RSI (14-day)
     delta       = hist["Close"].diff()
     gain        = delta.clip(lower=0).rolling(14).mean()
     loss        = -delta.clip(upper=0).rolling(14).mean()
     hist["RSI"] = 100 - (100 / (1 + gain / loss))
+
+    # MACD (for RL agent)
+    ema12 = hist["Close"].ewm(span=12, adjust=False).mean()
+    ema26 = hist["Close"].ewm(span=26, adjust=False).mean()
+    hist["MACD"] = ema12 - ema26
+    hist["MACD_Signal"] = hist["MACD"].ewm(span=9, adjust=False).mean()
+    hist["MACD_Hist"] = hist["MACD"] - hist["MACD_Signal"]
 
     # Max drawdown
     roll_max = hist["Close"].cummax()
@@ -131,7 +142,7 @@ def process_stock_data(ticker_symbol: str):
     rsi_s      = smooth(hist["RSI"].reindex(hist.index),      sigma=1.5)
     vol_smooth = hist["Volume"].rolling(5, center=True).mean() / 1e6
 
-    # ── Theme ─────────────────────────────────────────────────────────────
+    # ── Theme ────────────────────────────────────────────────────────────
     DARK   = "#0d1117"
     MID    = "#161b22"
     GRID   = "#21262d"
@@ -205,7 +216,7 @@ def process_stock_data(ticker_symbol: str):
     ax3.legend(facecolor=MID, edgecolor=GRID, labelcolor=TEXT, fontsize=7)
     style_ax(ax3)
 
-    # 4. RSI ───────────────────────────────────────────────────────────────
+    # 4. RSI ──────────────────────────────────────────────────────────────
     ax_rsi = fig.add_subplot(gs[2, :])
     rsi_safe = np.nan_to_num(rsi_s, nan=50.0)
     ax_rsi.plot(hist.index, rsi_s, color=BLUE, lw=1.5, zorder=3)
@@ -340,6 +351,7 @@ def process_stock_data(ticker_symbol: str):
         "week52_high":   week52_high,
         "week52_low":    week52_low,
         "earnings":      earnings_info,
+        "hist":          hist,  # Include full history for RL agent
     }
 
     return fig, metrics
