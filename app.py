@@ -6,12 +6,12 @@ from rl_agent import train_rl_agent
 
 st.set_page_config(
     page_title="Stock Analysis Dashboard",
-    page_icon="📈",
+    page_icon="",
     layout="wide",
 )
 
 
-st.title("📈 Stock Technical Analysis Platform")
+st.title("Stock Technical Analysis Platform")
 
 st.write(
     "Enter a stock ticker to pull historical market data and generate a "
